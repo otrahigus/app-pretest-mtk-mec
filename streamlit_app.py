@@ -25,41 +25,52 @@ NAMA_WORKSHEET = "Hasil"  # nama sheet/tab tujuan di Google Sheets
 
 # =========================================================
 # BANK SOAL (24 SOAL)
-# Format: (level, teks_soal, kunci_jawaban)
+# Setiap soal berupa dict:
+#   level  : level materi (0-3)
+#   soal   : teks pertanyaan
+#   kunci  : kunci jawaban
+#   tipe   : "text" (isian) atau "pilihan_ganda"
+#   opsi   : daftar pilihan (hanya untuk tipe "pilihan_ganda")
 # =========================================================
 QUESTIONS = [
     # ---------- LEVEL 0 ----------
-    (0, "Tuliskan angka yang hilang secara berurutan (pisahkan dengan koma):\n\n5, 6, __, 8, 9, __, 11", "7, 10"),
-    (0, "7 + 5 = ...", "12"),
-    (0, "15 - 3 = ...", "12"),
-    (0, "Tuliskan bilangan setelah 37: ...", "38"),
-    (0, "23 + 14 = ...", "37"),
-    (0, "46 - 22 = ...", "24"),
+    {"level": 0, "soal": "Tuliskan angka yang hilang secara berurutan (pisahkan dengan koma):\n\n5, 6, __, 8, 9, __, 11", "kunci": "7, 10", "tipe": "text"},
+    {"level": 0, "soal": "7 + 5 = ...", "kunci": "12", "tipe": "text"},
+    {"level": 0, "soal": "15 - 3 = ...", "kunci": "12", "tipe": "text"},
+    {"level": 0, "soal": "Tuliskan bilangan setelah 37: ...", "kunci": "38", "tipe": "text"},
+    {"level": 0, "soal": "23 + 14 = ...", "kunci": "37", "tipe": "text"},
+    {"level": 0, "soal": "46 - 22 = ...", "kunci": "24", "tipe": "text"},
     # ---------- LEVEL 1 ----------
-    (1, "Tuliskan bilangan sebelum 80: ...", "79"),
-    (1, "43 + 26 = ...", "69"),
-    (1, "38 + 27 = ...", "65"),
-    (1, "75 - 34 = ...", "41"),
-    (1, "62 - 48 = ...", "14"),
-    (1, "Budi mempunyai 45 kelereng. Ia memberikan 18 kelereng kepada Adi. "
-        "Berapa sisa kelereng Budi?", "27"),
+    {"level": 1, "soal": "Tuliskan bilangan sebelum 80: ...", "kunci": "79", "tipe": "text"},
+    {"level": 1, "soal": "43 + 26 = ...", "kunci": "69", "tipe": "text"},
+    {"level": 1, "soal": "38 + 27 = ...", "kunci": "65", "tipe": "text"},
+    {"level": 1, "soal": "75 - 34 = ...", "kunci": "41", "tipe": "text"},
+    {"level": 1, "soal": "62 - 48 = ...", "kunci": "14", "tipe": "text"},
+    {"level": 1, "soal": "Budi mempunyai 45 kelereng. Ia memberikan 18 kelereng kepada Adi. "
+                          "Berapa sisa kelereng Budi?", "kunci": "27", "tipe": "text"},
     # ---------- LEVEL 2 ----------
-    (2, "4 × 3 = ...", "12"),
-    (2, "20 : 5 = ...", "4"),
-    (2, "7 × 8 = ...", "56"),
-    (2, "54 : 6 = ...", "9"),
-    (2, "Ada 6 kantong, masing-masing berisi 5 apel. Berapa total apel seluruhnya?", "30"),
-    (2, "15 + 7 - 3 = ...", "19"),
+    {"level": 2, "soal": "4 × 3 = ...", "kunci": "12", "tipe": "text"},
+    {"level": 2, "soal": "20 : 5 = ...", "kunci": "4", "tipe": "text"},
+    {"level": 2, "soal": "7 × 8 = ...", "kunci": "56", "tipe": "text"},
+    {"level": 2, "soal": "54 : 6 = ...", "kunci": "9", "tipe": "text"},
+    {"level": 2, "soal": "Ada 6 kantong, masing-masing berisi 5 apel. Berapa total apel seluruhnya?", "kunci": "30", "tipe": "text"},
+    {"level": 2, "soal": "15 + 7 - 3 = ...", "kunci": "19", "tipe": "text"},
     # ---------- LEVEL 3 ----------
-    (3, "276 + 158 = ...", "434"),
-    (3, "503 - 287 = ...", "216"),
-    (3, "Pada angka 4.725, angka 7 menempati nilai tempat ....", "ratusan"),
-    (3, "Urutkan dari yang terkecil (pisahkan dengan koma):\n\n675, 521, 789, 432",
-        "432, 521, 675, 789"),
-    (3, "34 × 6 = ...", "204"),
-    (3, "Ibu membeli 4 kotak pensil. Setiap kotak berisi 12 pensil. "
-        "Ibu membagikan 15 pensil kepada murid-muridnya. "
-        "Berapa sisa pensil Ibu sekarang?", "33"),
+    {"level": 3, "soal": "276 + 158 = ...", "kunci": "434", "tipe": "text"},
+    {"level": 3, "soal": "503 - 287 = ...", "kunci": "216", "tipe": "text"},
+    {
+        "level": 3,
+        "soal": "Pada angka 4.725, angka 7 menempati nilai tempat ....",
+        "kunci": "Ratusan",
+        "tipe": "pilihan_ganda",
+        "opsi": ["Ribuan", "Ratusan", "Puluhan", "Satuan"],
+    },
+    {"level": 3, "soal": "Urutkan dari yang terkecil (pisahkan dengan koma):\n\n675, 521, 789, 432",
+     "kunci": "432, 521, 675, 789", "tipe": "text"},
+    {"level": 3, "soal": "34 × 6 = ...", "kunci": "204", "tipe": "text"},
+    {"level": 3, "soal": "Ibu membeli 4 kotak pensil. Setiap kotak berisi 12 pensil. "
+                          "Ibu membagikan 15 pensil kepada murid-muridnya. "
+                          "Berapa sisa pensil Ibu sekarang?", "kunci": "33", "tipe": "text"},
 ]
 
 TOTAL_SOAL = len(QUESTIONS)
@@ -178,7 +189,11 @@ if st.session_state.tahap == "identitas":
 # =========================================================
 elif st.session_state.tahap == "soal":
     idx = st.session_state.index_soal
-    level_soal, teks_soal, kunci_jawaban = QUESTIONS[idx]
+    soal_aktif = QUESTIONS[idx]
+    level_soal = soal_aktif["level"]
+    teks_soal = soal_aktif["soal"]
+    kunci_jawaban = soal_aktif["kunci"]
+    tipe_soal = soal_aktif["tipe"]
 
     st.title("🧮 Pretest Matematika")
     st.progress((idx) / TOTAL_SOAL)
@@ -188,7 +203,16 @@ elif st.session_state.tahap == "soal":
     st.write(teks_soal)
 
     with st.form(key=f"form_soal_{idx}"):
-        jawaban = st.text_input("Jawaban Anda:", key=f"input_{idx}")
+        if tipe_soal == "pilihan_ganda":
+            jawaban = st.radio(
+                "Pilih jawaban:",
+                options=soal_aktif["opsi"],
+                index=None,
+                key=f"input_{idx}",
+            )
+        else:
+            jawaban = st.text_input("Jawaban Anda:", key=f"input_{idx}")
+
         lanjut = st.form_submit_button("Jawab & Lanjut ➜")
 
         if lanjut:
