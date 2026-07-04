@@ -108,6 +108,28 @@ def tentukan_level(skor: int) -> str:
         return "Level 0.1"
 
 
+def sudah_pernah_pretest(nama: str, kelas: str) -> bool:
+    """Mengecek ke Google Sheets apakah kombinasi Nama+Kelas ini
+    sudah pernah mengerjakan pretest sebelumnya."""
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    try:
+        data = conn.read(worksheet=NAMA_WORKSHEET, ttl=0)
+        data = data.dropna(how="all")
+    except Exception:
+        # Worksheet belum ada -> belum pernah ada yang mengerjakan pretest
+        return False
+
+    if data.empty or "Nama" not in data.columns or "Kelas" not in data.columns:
+        return False
+
+    nama_target = normalisasi(nama)
+    kelas_target = normalisasi(kelas)
+
+    nama_cocok = data["Nama"].astype(str).apply(normalisasi) == nama_target
+    kelas_cocok = data["Kelas"].astype(str).apply(normalisasi) == kelas_target
+    return bool((nama_cocok & kelas_cocok).any())
+
+
 def simpan_ke_gsheets(nama: str, kelas: str, daftar_jawaban: list, skor: int, level: str):
     """Menyimpan satu baris hasil pretest ke Google Sheets."""
     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -179,10 +201,21 @@ if st.session_state.tahap == "identitas":
             if nama_input.strip() == "" or kelas_input.strip() == "":
                 st.warning("Mohon isi Nama dan Kelas terlebih dahulu.")
             else:
-                st.session_state.nama = nama_input.strip()
-                st.session_state.kelas = kelas_input.strip()
-                st.session_state.tahap = "soal"
-                st.rerun()
+                with st.spinner("Memeriksa data..."):
+                    sudah_pernah = sudah_pernah_pretest(nama_input.strip(), kelas_input.strip())
+
+                if sudah_pernah:
+                    st.error(
+                        "❌ Data dengan Nama dan Kelas ini sudah pernah mengerjakan "
+                        "pretest sebelumnya. Setiap siswa hanya dapat mengerjakan "
+                        "pretest satu kali. Jika kamu merasa ini keliru, silakan "
+                        "hubungi gurumu."
+                    )
+                else:
+                    st.session_state.nama = nama_input.strip()
+                    st.session_state.kelas = kelas_input.strip()
+                    st.session_state.tahap = "soal"
+                    st.rerun()
 
 # =========================================================
 # TAHAP 2: MENAMPILKAN SOAL SATU PER SATU

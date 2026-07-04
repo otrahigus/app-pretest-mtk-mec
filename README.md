@@ -9,7 +9,10 @@ menjalankan aplikasi secara lokal, dan deploy ke Streamlit Community Cloud.
 
 1. Buat Google Sheet baru, beri nama misalnya **"Database Pretest Matematika"**.
 2. Buat satu sheet/tab dengan nama **`Hasil`** (huruf besar-kecil harus sama
-   persis dengan `NAMA_WORKSHEET` di `streamlit_app.py`).
+   persis dengan `NAMA_WORKSHEET` di `streamlit_app.py`). Ini opsional —
+   kalau tab `Hasil` belum ada, aplikasi akan **membuatnya secara otomatis**
+   saat siswa pertama menyelesaikan pretest. Namun tetap disarankan membuat
+   tab-nya lebih dulu secara manual agar lebih terkontrol.
 3. Baris pertama boleh dikosongkan — aplikasi akan otomatis membuat header
    saat data pertama disimpan. Jika ingin header manual, isi baris 1 dengan:
    `Timestamp, Nama, Kelas, Skor, Level, Soal_1_Jawaban, Soal_1_Benar, ...`
@@ -147,5 +150,6 @@ Aplikasi akan terbuka di browser pada `http://localhost:8501`.
 |---|---|---|
 | `PERMISSION_DENIED` | Sheet belum di-share ke service account | Ulangi langkah 3 |
 | `SpreadsheetNotFound` | URL di secrets salah/typo | Cek ulang `spreadsheet` di secrets.toml |
+| `WorksheetNotFound` | Tab `Hasil` belum ada di spreadsheet | Sudah ditangani otomatis oleh kode (akan dibuat sendiri saat data pertama disimpan). Jika masih error, pastikan service account punya akses **Editor**, karena membuat tab baru butuh izin tulis |
 | Data tidak muncul di Sheets | Nama worksheet tidak sama (`Hasil`) | Samakan nama tab dengan `NAMA_WORKSHEET` |
 | Error saat deploy karena `secrets.toml` tidak ada | Secrets belum diisi di dashboard Streamlit Cloud | Isi via App settings > Secrets |
