@@ -101,11 +101,14 @@ def simpan_ke_gsheets(nama: str, kelas: str, daftar_jawaban: list, skor: int, le
     """Menyimpan satu baris hasil pretest ke Google Sheets."""
     conn = st.connection("gsheets", type=GSheetsConnection)
 
+    worksheet_sudah_ada = True
     try:
         data_lama = conn.read(worksheet=NAMA_WORKSHEET, ttl=0)
         data_lama = data_lama.dropna(how="all")
     except Exception:
+        # Worksheet dengan nama NAMA_WORKSHEET belum ada di spreadsheet
         data_lama = pd.DataFrame()
+        worksheet_sudah_ada = False
 
     baris_baru = {
         "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -120,7 +123,12 @@ def simpan_ke_gsheets(nama: str, kelas: str, daftar_jawaban: list, skor: int, le
 
     df_baru = pd.DataFrame([baris_baru])
     data_gabungan = pd.concat([data_lama, df_baru], ignore_index=True)
-    conn.update(worksheet=NAMA_WORKSHEET, data=data_gabungan)
+
+    if worksheet_sudah_ada:
+        conn.update(worksheet=NAMA_WORKSHEET, data=data_gabungan)
+    else:
+        # Worksheet belum tersedia di spreadsheet -> buat baru sekaligus isi datanya
+        conn.create(worksheet=NAMA_WORKSHEET, data=data_gabungan)
 
 
 # =========================================================
