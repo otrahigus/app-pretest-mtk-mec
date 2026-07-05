@@ -5,6 +5,8 @@ Hasil otomatis tersimpan ke Google Sheets, level ditentukan otomatis.
 Siswa TIDAK melihat skor/level (hanya untuk guru, tersimpan di Sheets).
 """
 
+import base64
+import json
 import re
 from datetime import datetime
 
@@ -130,6 +132,46 @@ def sudah_pernah_pretest(nama: str, kelas: str) -> bool:
     return bool((nama_cocok & kelas_cocok).any())
 
 
+# =========================================================
+# PENYIMPANAN PROGRES KE URL (agar tahan terhadap refresh /
+# koneksi terputus saat siswa lama menjawab)
+# =========================================================
+def _encode_progress(data: dict) -> str:
+    mentah = json.dumps(data, ensure_ascii=False)
+    return base64.urlsafe_b64encode(mentah.encode("utf-8")).decode("utf-8")
+
+
+def _decode_progress(token: str) -> dict:
+    mentah = base64.urlsafe_b64decode(token.encode("utf-8")).decode("utf-8")
+    return json.loads(mentah)
+
+
+def simpan_progres_ke_url():
+    """Menyalin progres pengerjaan saat ini ke query parameter URL,
+    sehingga jika halaman ter-refresh (mis. koneksi sempat terputus),
+    progres dapat dipulihkan tanpa mengulang dari soal nomor 1."""
+    data = {
+        "tahap": st.session_state.tahap,
+        "index_soal": st.session_state.index_soal,
+        "daftar_jawaban": st.session_state.daftar_jawaban,
+        "nama": st.session_state.nama,
+        "kelas": st.session_state.kelas,
+        "tersimpan": st.session_state.tersimpan,
+    }
+    try:
+        st.query_params["p"] = _encode_progress(data)
+    except Exception:
+        pass  # jika gagal, biarkan saja -> paling buruk progres tidak tersimpan di URL
+
+
+def hapus_progres_url():
+    try:
+        if "p" in st.query_params:
+            del st.query_params["p"]
+    except Exception:
+        pass
+
+
 def simpan_ke_gsheets(nama: str, kelas: str, daftar_jawaban: list, skor: int, level: str):
     """Menyimpan satu baris hasil pretest ke Google Sheets."""
     conn = st.connection("gsheets", type=GSheetsConnection)
@@ -165,20 +207,31 @@ def simpan_ke_gsheets(nama: str, kelas: str, daftar_jawaban: list, skor: int, le
 
 
 # =========================================================
-# STATE AWAL
+# STATE AWAL (dipulihkan dari URL jika sesi sebelumnya sempat
+# terputus, misalnya karena siswa lama menjawab)
 # =========================================================
 if "tahap" not in st.session_state:
-    st.session_state.tahap = "identitas"   # identitas -> soal -> selesai
-if "index_soal" not in st.session_state:
-    st.session_state.index_soal = 0
-if "daftar_jawaban" not in st.session_state:
-    st.session_state.daftar_jawaban = []
-if "nama" not in st.session_state:
-    st.session_state.nama = ""
-if "kelas" not in st.session_state:
-    st.session_state.kelas = ""
-if "tersimpan" not in st.session_state:
-    st.session_state.tersimpan = False
+    progres_url = None
+    try:
+        if "p" in st.query_params:
+            progres_url = _decode_progress(st.query_params["p"])
+    except Exception:
+        progres_url = None
+
+    if progres_url:
+        st.session_state.tahap = progres_url.get("tahap", "identitas")
+        st.session_state.index_soal = progres_url.get("index_soal", 0)
+        st.session_state.daftar_jawaban = progres_url.get("daftar_jawaban", [])
+        st.session_state.nama = progres_url.get("nama", "")
+        st.session_state.kelas = progres_url.get("kelas", "")
+        st.session_state.tersimpan = progres_url.get("tersimpan", False)
+    else:
+        st.session_state.tahap = "identitas"   # identitas -> soal -> selesai
+        st.session_state.index_soal = 0
+        st.session_state.daftar_jawaban = []
+        st.session_state.nama = ""
+        st.session_state.kelas = ""
+        st.session_state.tersimpan = False
 
 
 # =========================================================
@@ -215,6 +268,7 @@ if st.session_state.tahap == "identitas":
                     st.session_state.nama = nama_input.strip()
                     st.session_state.kelas = kelas_input.strip()
                     st.session_state.tahap = "soal"
+                    simpan_progres_ke_url()
                     st.rerun()
 
 # =========================================================
@@ -234,6 +288,7 @@ elif st.session_state.tahap == "soal":
 
     st.markdown(f"### Soal {idx + 1}")
     st.write(teks_soal)
+    st.caption("💡 Jika halaman error atau blank, refresh saja — progresmu tidak akan hilang.")
 
     with st.form(key=f"form_soal_{idx}"):
         if tipe_soal == "pilihan_ganda":
@@ -257,6 +312,7 @@ elif st.session_state.tahap == "soal":
                 st.session_state.index_soal += 1
             else:
                 st.session_state.tahap = "selesai"
+            simpan_progres_ke_url()
             st.rerun()
 
 # =========================================================
@@ -280,6 +336,7 @@ elif st.session_state.tahap == "selesai":
                 level,
             )
             st.session_state.tersimpan = True
+            simpan_progres_ke_url()
         except Exception as e:
             st.error(
                 "Terjadi kendala saat menyimpan hasil. "
@@ -300,6 +357,7 @@ elif st.session_state.tahap == "selesai":
     if st.button("Isi Ulang / Selesai"):
         for key in ["tahap", "index_soal", "daftar_jawaban", "nama", "kelas", "tersimpan"]:
             del st.session_state[key]
+        hapus_progres_url()
         st.rerun()
 
 # =========================================================
