@@ -138,9 +138,33 @@ Aplikasi akan terbuka di browser pada `http://localhost:8501`.
 
 - Buka Google Sheet yang sudah dihubungkan, lalu buka tab **Hasil**.
 - Setiap kali siswa menyelesaikan pretest, satu baris baru otomatis
-  ditambahkan berisi: Timestamp, Nama, Kelas, Skor, Level, dan rincian
-  jawaban tiap soal (benar/salah).
-- Level awal siswa dapat langsung dilihat pada kolom **Level**.
+  ditambahkan berisi:
+  - `Timestamp`, `Nama`, `Kelas`
+  - `Level_Penempatan` (contoh: "Level 10.1") dan `Level_Penempatan_Angka`
+  - `Level_Tertinggi_Lulus` — level tertinggi yang berhasil dilewati siswa
+  - `Total_Soal_Dikerjakan` dan `Total_Benar` — jumlah soal yang dijalani
+    (bervariasi antar siswa karena sistem adaptif, biasanya sekitar 10-12 soal)
+  - `Ringkasan_Per_Ronde` — ringkasan tiap tahap pengujian, contoh:
+    `Level 15 (Statistika...): 2/2 LULUS | Level 23 (...): 1/2 gagal`
+  - `Detail_Jawaban_JSON` — rincian lengkap tiap soal & jawaban dalam format
+    JSON, bisa dibuka/diformat ulang jika perlu audit mendalam.
+- Level penempatan siswa dapat langsung dilihat pada kolom
+  **`Level_Penempatan`**.
+
+### Catatan tentang sistem adaptif
+Pretest ini menggunakan metode **binary search** di antara Level 0–30
+(mengikuti kurikulum SD-SMP). Setiap level diuji dengan 2 soal representatif:
+- Kedua soal benar → level dianggap **lulus**, sistem naik menguji level
+  lebih tinggi.
+- Ada yang salah → level dianggap **belum lulus**, sistem turun menguji
+  level lebih rendah.
+- Proses berhenti ketika rentang pencarian habis (maksimal ~6 tahap
+  pengujian), dan level penempatan akhir = satu level di atas level
+  tertinggi yang berhasil dilewati.
+
+Karena sifatnya adaptif, jumlah soal yang dikerjakan setiap siswa bisa
+berbeda-beda — ini normal dan merupakan bagian dari desain agar pretest
+lebih efisien dan tetap akurat menemukan level yang pas untuk tiap anak.
 
 ---
 

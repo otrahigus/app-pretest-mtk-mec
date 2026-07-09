@@ -1,8 +1,8 @@
 """
-Aplikasi Pretest Matematika - Operasi Hitung Bilangan Bulat
-Level 0 s.d. Level 3 | 24 Soal
-Hasil otomatis tersimpan ke Google Sheets, level ditentukan otomatis.
-Siswa TIDAK melihat skor/level (hanya untuk guru, tersimpan di Sheets).
+Aplikasi Pretest Matematika ADAPTIF - Level 0 s.d. Level 30 (SD-SMP)
+Menggunakan metode binary search: anak diuji di level tebakan, naik/turun
+berdasarkan benar/salah, sampai ditemukan level penempatan yang pas.
+Hasil otomatis tersimpan ke Google Sheets. Siswa TIDAK melihat skor/level.
 """
 
 import base64
@@ -23,59 +23,187 @@ st.set_page_config(
     layout="centered",
 )
 
-NAMA_WORKSHEET = "Hasil"  # nama sheet/tab tujuan di Google Sheets
+NAMA_WORKSHEET = "Hasil"   # nama sheet/tab tujuan di Google Sheets
+LEVEL_MIN = 0
+LEVEL_MAX = 30
+MAKS_RONDE = 6              # pengaman agar tidak berputar tanpa henti (log2(31) ~ 5)
 
 # =========================================================
-# BANK SOAL (24 SOAL)
-# Setiap soal berupa dict:
-#   level  : level materi (0-3)
-#   soal   : teks pertanyaan
-#   kunci  : kunci jawaban
-#   tipe   : "text" (isian) atau "pilihan_ganda"
-#   opsi   : daftar pilihan (hanya untuk tipe "pilihan_ganda")
+# NAMA LEVEL (untuk ditampilkan ke guru di sidebar & Google Sheets)
 # =========================================================
-QUESTIONS = [
-    # ---------- LEVEL 0 ----------
-    {"level": 0, "soal": "Tuliskan angka yang hilang secara berurutan (pisahkan dengan koma):\n\n5, 6, __, 8, 9, __, 11", "kunci": "7, 10", "tipe": "text"},
-    {"level": 0, "soal": "7 + 5 = ...", "kunci": "12", "tipe": "text"},
-    {"level": 0, "soal": "15 - 3 = ...", "kunci": "12", "tipe": "text"},
-    {"level": 0, "soal": "Tuliskan bilangan setelah 37: ...", "kunci": "38", "tipe": "text"},
-    {"level": 0, "soal": "23 + 14 = ...", "kunci": "37", "tipe": "text"},
-    {"level": 0, "soal": "46 - 22 = ...", "kunci": "24", "tipe": "text"},
-    # ---------- LEVEL 1 ----------
-    {"level": 1, "soal": "Tuliskan bilangan sebelum 80: ...", "kunci": "79", "tipe": "text"},
-    {"level": 1, "soal": "43 + 26 = ...", "kunci": "69", "tipe": "text"},
-    {"level": 1, "soal": "38 + 27 = ...", "kunci": "65", "tipe": "text"},
-    {"level": 1, "soal": "75 - 34 = ...", "kunci": "41", "tipe": "text"},
-    {"level": 1, "soal": "62 - 48 = ...", "kunci": "14", "tipe": "text"},
-    {"level": 1, "soal": "Budi mempunyai 45 kelereng. Ia memberikan 18 kelereng kepada Adi. "
-                          "Berapa sisa kelereng Budi?", "kunci": "27", "tipe": "text"},
-    # ---------- LEVEL 2 ----------
-    {"level": 2, "soal": "4 × 3 = ...", "kunci": "12", "tipe": "text"},
-    {"level": 2, "soal": "20 : 5 = ...", "kunci": "4", "tipe": "text"},
-    {"level": 2, "soal": "7 × 8 = ...", "kunci": "56", "tipe": "text"},
-    {"level": 2, "soal": "54 : 6 = ...", "kunci": "9", "tipe": "text"},
-    {"level": 2, "soal": "Ada 6 kantong, masing-masing berisi 5 apel. Berapa total apel seluruhnya?", "kunci": "30", "tipe": "text"},
-    {"level": 2, "soal": "15 + 7 - 3 = ...", "kunci": "19", "tipe": "text"},
-    # ---------- LEVEL 3 ----------
-    {"level": 3, "soal": "276 + 158 = ...", "kunci": "434", "tipe": "text"},
-    {"level": 3, "soal": "503 - 287 = ...", "kunci": "216", "tipe": "text"},
-    {
-        "level": 3,
-        "soal": "Pada angka 4.725, angka 7 menempati nilai tempat ....",
-        "kunci": "Ratusan",
-        "tipe": "pilihan_ganda",
-        "opsi": ["Ribuan", "Ratusan", "Puluhan", "Satuan"],
-    },
-    {"level": 3, "soal": "Urutkan dari yang terkecil (pisahkan dengan koma):\n\n675, 521, 789, 432",
-     "kunci": "432, 521, 675, 789", "tipe": "text"},
-    {"level": 3, "soal": "34 × 6 = ...", "kunci": "204", "tipe": "text"},
-    {"level": 3, "soal": "Ibu membeli 4 kotak pensil. Setiap kotak berisi 12 pensil. "
-                          "Ibu membagikan 15 pensil kepada murid-muridnya. "
-                          "Berapa sisa pensil Ibu sekarang?", "kunci": "33", "tipe": "text"},
-]
+NAMA_LEVEL = {
+    0: "Berhitung 1-50, +/- Dasar",
+    1: "Berhitung 1-100, +/- Menyimpan/Meminjam",
+    2: "Perkalian & Pembagian 1-10",
+    3: "Bersusun Ratusan, Nilai Tempat",
+    4: "Pecahan Dasar, +/- Penyebut Sama",
+    5: "Persiapan Kelas Lanjut",
+    6: "Menyederhanakan Pecahan, +/- Penyebut Beda",
+    7: "Bilangan Bulat Positif/Negatif",
+    8: "Satuan & Pengukuran",
+    9: "Pola Bilangan, Variabel, Persamaan",
+    10: "Nilai Tempat sampai 10.000",
+    11: "+/- Pecahan Penyebut Beda",
+    12: "Perbandingan, Skala, Untung/Rugi",
+    13: "Bangun Datar & Volume",
+    14: "Jaring-jaring, Luas Permukaan & Tabung",
+    15: "Statistika, Mean/Median/Modus, Peluang",
+    16: "Bentuk Aljabar, PLSV",
+    17: "Perbandingan & Trigonometri Dasar",
+    18: "Himpunan & Diagram Venn",
+    19: "Bilangan Berpangkat & Bentuk Akar",
+    20: "PLSV, PtLSV, PLDV",
+    21: "SPLDV",
+    22: "Relasi & Fungsi",
+    23: "Garis & Sudut",
+    24: "Segitiga & Teorema Pythagoras",
+    25: "Segiempat & Segi-n",
+    26: "Bangun Ruang Sisi Datar & Luas Permukaan",
+    27: "Volume Bangun Ruang",
+    28: "Lingkaran",
+    29: "Statistika & Peluang",
+    30: "Trigonometri & Transformasi",
+}
 
-TOTAL_SOAL = len(QUESTIONS)
+# =========================================================
+# BANK SOAL — 2 soal representatif per level (0-30)
+# Setiap soal: {"soal":..., "kunci":..., "tipe":"text"/"pilihan_ganda", "opsi": [...]}
+# =========================================================
+ITEM_BANK = {
+    0: [
+        {"soal": "23 + 14 = ...", "kunci": "37", "tipe": "text"},
+        {"soal": "46 - 22 = ...", "kunci": "24", "tipe": "text"},
+    ],
+    1: [
+        {"soal": "38 + 27 = ...", "kunci": "65", "tipe": "text"},
+        {"soal": "62 - 48 = ...", "kunci": "14", "tipe": "text"},
+    ],
+    2: [
+        {"soal": "7 × 8 = ...", "kunci": "56", "tipe": "text"},
+        {"soal": "54 : 6 = ...", "kunci": "9", "tipe": "text"},
+    ],
+    3: [
+        {
+            "soal": "Pada angka 4.725, angka 7 menempati nilai tempat ....",
+            "kunci": "Ratusan",
+            "tipe": "pilihan_ganda",
+            "opsi": ["Ribuan", "Ratusan", "Puluhan", "Satuan"],
+        },
+        {"soal": "34 × 6 = ...", "kunci": "204", "tipe": "text"},
+    ],
+    4: [
+        {"soal": "1/4 + 2/4 = ... (tulis sebagai pecahan, contoh: 3/4)", "kunci": "3/4", "tipe": "text"},
+        {"soal": "Ubah pecahan 1/2 menjadi desimal: ...", "kunci": "0,5", "tipe": "text"},
+    ],
+    5: [
+        {"soal": "23 × 14 = ...", "kunci": "322", "tipe": "text"},
+        {"soal": "(8 + 4) × 2 = ...", "kunci": "24", "tipe": "text"},
+    ],
+    6: [
+        {"soal": "Sederhanakan pecahan 8/12 menjadi bentuk paling sederhana: ...", "kunci": "2/3", "tipe": "text"},
+        {"soal": "1/2 + 1/4 = ... (tulis sebagai pecahan)", "kunci": "3/4", "tipe": "text"},
+    ],
+    7: [
+        {"soal": "(-5) + 8 = ...", "kunci": "3", "tipe": "text"},
+        {"soal": "-3 + 5 × 2 = ...", "kunci": "7", "tipe": "text"},
+    ],
+    8: [
+        {"soal": "5 km = ... m", "kunci": "5000", "tipe": "text"},
+        {"soal": "Keliling persegi panjang dengan panjang 8 cm dan lebar 5 cm = ... cm", "kunci": "26", "tipe": "text"},
+    ],
+    9: [
+        {"soal": "Lengkapi pola berikut: 2, 4, 6, 8, ...", "kunci": "10", "tipe": "text"},
+        {"soal": "Jika x + 5 = 12, maka x = ...", "kunci": "7", "tipe": "text"},
+    ],
+    10: [
+        {"soal": "3245 + 4518 = ...", "kunci": "7763", "tipe": "text"},
+        {"soal": "215 × 4 = ...", "kunci": "860", "tipe": "text"},
+    ],
+    11: [
+        {"soal": "1/3 + 1/4 = ... (tulis sebagai pecahan, contoh: 7/12)", "kunci": "7/12", "tipe": "text"},
+        {"soal": "2/3 × 3/4 = ... (tulis sebagai pecahan paling sederhana)", "kunci": "1/2", "tipe": "text"},
+    ],
+    12: [
+        {"soal": "Jika harga 4 kg apel adalah Rp60.000, berapa harga 6 kg apel? (tulis angka saja, tanpa titik)", "kunci": "90000", "tipe": "text"},
+        {"soal": "Sebuah sepatu dibeli Rp150.000 dan dijual Rp180.000. Berapa untungnya? (angka saja)", "kunci": "30000", "tipe": "text"},
+    ],
+    13: [
+        {"soal": "Luas segitiga dengan alas 10 cm dan tinggi 8 cm = ... cm²", "kunci": "40", "tipe": "text"},
+        {"soal": "Volume balok dengan panjang 5 cm, lebar 4 cm, tinggi 3 cm = ... cm³", "kunci": "60", "tipe": "text"},
+    ],
+    14: [
+        {"soal": "Luas permukaan balok dengan p=4 cm, l=3 cm, t=2 cm = ... cm²", "kunci": "52", "tipe": "text"},
+        {"soal": "Volume tabung dengan jari-jari 7 cm dan tinggi 10 cm (π = 22/7) = ... cm³", "kunci": "1540", "tipe": "text"},
+    ],
+    15: [
+        {"soal": "Mean (rata-rata) dari data 4, 6, 8, 10, 12 adalah ...", "kunci": "8", "tipe": "text"},
+        {"soal": "Median dari data 3, 7, 9, 10, 15 adalah ...", "kunci": "9", "tipe": "text"},
+    ],
+    16: [
+        {"soal": "3x + 5x = ...", "kunci": "8x", "tipe": "text"},
+        {"soal": "Jika 2x + 3 = 11, maka x = ...", "kunci": "4", "tipe": "text"},
+    ],
+    17: [
+        {"soal": "Jika a : b = 2 : 3 dan a = 8, maka b = ...", "kunci": "12", "tipe": "text"},
+        {"soal": "sin 30° = ... (tulis sebagai pecahan, contoh: 1/2)", "kunci": "1/2", "tipe": "text"},
+    ],
+    18: [
+        {"soal": "Diketahui A = {1,2,3,4} dan B = {3,4,5,6}. Tuliskan anggota A ∩ B (pisahkan dengan koma):", "kunci": "3, 4", "tipe": "text"},
+        {"soal": "Diketahui A = {1,2,3,4} dan B = {3,4,5,6}. Tuliskan anggota A ∪ B (pisahkan dengan koma):", "kunci": "1, 2, 3, 4, 5, 6", "tipe": "text"},
+    ],
+    19: [
+        {"soal": "2³ = ...", "kunci": "8", "tipe": "text"},
+        {"soal": "√64 = ...", "kunci": "8", "tipe": "text"},
+    ],
+    20: [
+        {"soal": "Selesaikan pertidaksamaan 2x + 3 > 7. Nilai batas x adalah ...", "kunci": "2", "tipe": "text"},
+        {"soal": "Diketahui 2x + y = 10. Jika x = 3, maka y = ...", "kunci": "4", "tipe": "text"},
+    ],
+    21: [
+        {"soal": "Diketahui x + y = 7 dan x - y = 1. Nilai x = ...", "kunci": "4", "tipe": "text"},
+        {"soal": "Diketahui x + y = 7 dan x - y = 1. Nilai y = ...", "kunci": "3", "tipe": "text"},
+    ],
+    22: [
+        {"soal": "Jika f(x) = 2x + 3, maka f(4) = ...", "kunci": "11", "tipe": "text"},
+        {"soal": "Jika f(x) = 3x - 2 dan f(x) = 13, maka x = ...", "kunci": "5", "tipe": "text"},
+    ],
+    23: [
+        {"soal": "Dua sudut saling berpelurus. Salah satu sudutnya 65°. Sudut lainnya = ... derajat", "kunci": "115", "tipe": "text"},
+        {"soal": "Sebuah sudut siku-siku dibagi menjadi dua sudut sama besar. Besar masing-masing sudut = ... derajat", "kunci": "45", "tipe": "text"},
+    ],
+    24: [
+        {"soal": "Segitiga siku-siku memiliki sisi siku-siku 3 cm dan 4 cm. Panjang sisi miring = ... cm", "kunci": "5", "tipe": "text"},
+        {"soal": "Luas segitiga siku-siku dengan sisi siku-siku 6 cm dan 8 cm = ... cm²", "kunci": "24", "tipe": "text"},
+    ],
+    25: [
+        {"soal": "Keliling persegi dengan panjang sisi 9 cm = ... cm", "kunci": "36", "tipe": "text"},
+        {"soal": "Jumlah besar sudut dalam segi-8 (oktagon) = ... derajat", "kunci": "1080", "tipe": "text"},
+    ],
+    26: [
+        {"soal": "Luas permukaan kubus dengan panjang sisi 5 cm = ... cm²", "kunci": "150", "tipe": "text"},
+        {"soal": "Sebuah limas memiliki luas alas 16 cm² dan jumlah luas sisi tegak 48 cm². Luas permukaannya = ... cm²", "kunci": "64", "tipe": "text"},
+    ],
+    27: [
+        {"soal": "Volume kubus dengan panjang sisi 6 cm = ... cm³", "kunci": "216", "tipe": "text"},
+        {"soal": "Volume tabung dengan jari-jari 7 cm dan tinggi 10 cm (π = 22/7) = ... cm³", "kunci": "1540", "tipe": "text"},
+    ],
+    28: [
+        {"soal": "Keliling lingkaran dengan jari-jari 14 cm (π = 22/7) = ... cm", "kunci": "88", "tipe": "text"},
+        {"soal": "Luas lingkaran dengan jari-jari 7 cm (π = 22/7) = ... cm²", "kunci": "154", "tipe": "text"},
+    ],
+    29: [
+        {"soal": "Mean dari data 5, 7, 9, 11, 13 adalah ...", "kunci": "9", "tipe": "text"},
+        {"soal": "Sebuah dadu dilempar sekali. Peluang muncul angka genap = ... (tulis sebagai pecahan, contoh: 1/2)", "kunci": "1/2", "tipe": "text"},
+    ],
+    30: [
+        {"soal": "cos 60° = ... (tulis sebagai pecahan, contoh: 1/2)", "kunci": "1/2", "tipe": "text"},
+        {"soal": "Titik A(2,3) ditranslasikan oleh (3,-1). Koordinat bayangannya = ... (format: x,y)", "kunci": "5, 2", "tipe": "text"},
+    ],
+}
+
+# Tebakan level awal berdasarkan kelas siswa (dipetakan kasar ke kurikulum di atas)
+KELAS_KE_LEVEL_AWAL = {1: 1, 2: 3, 3: 5, 4: 8, 5: 11, 6: 13, 7: 17, 8: 21, 9: 25}
+LEVEL_AWAL_DEFAULT = 15  # jika kelas tidak diketahui/tidak bisa dibaca -> mulai di tengah
 
 
 # =========================================================
@@ -83,53 +211,40 @@ TOTAL_SOAL = len(QUESTIONS)
 # =========================================================
 def normalisasi(teks: str) -> str:
     """Menormalkan teks jawaban agar perbandingan lebih toleran
-    terhadap spasi, huruf besar/kecil, dan format koma."""
+    terhadap spasi, huruf besar/kecil, dan format koma/titik ribuan."""
     teks = str(teks).strip().lower()
-    teks = re.sub(r"\s*,\s*", ",", teks)   # rapikan spasi di sekitar koma
-    teks = re.sub(r"\s+", "", teks)        # hapus semua spasi tersisa
-    teks = teks.replace(".", "")           # abaikan titik ribuan, jika ada
+    teks = re.sub(r"\s*,\s*", ",", teks)
+    teks = re.sub(r"\s+", "", teks)
     return teks
 
 
 def cek_jawaban(jawaban_siswa: str, kunci: str) -> bool:
-    if jawaban_siswa is None or jawaban_siswa.strip() == "":
+    if jawaban_siswa is None or str(jawaban_siswa).strip() == "":
         return False
     return normalisasi(jawaban_siswa) == normalisasi(kunci)
 
 
-def tentukan_level(skor: int) -> str:
-    if skor == 24:
-        return "Lulus semua level"
-    elif 19 <= skor <= 23:
-        return "Level 3.1"
-    elif 13 <= skor <= 18:
-        return "Level 2.1"
-    elif 7 <= skor <= 12:
-        return "Level 1.1"
-    else:
-        return "Level 0.1"
+def tebak_level_awal(kelas_input: str) -> int:
+    """Menebak level awal yang masuk akal berdasarkan angka kelas yang
+    dituliskan siswa (mis. '5', '5A', 'VII', dll). Jika tidak terbaca,
+    pakai level tengah sebagai default."""
+    m = re.search(r"\d+", str(kelas_input))
+    if m:
+        angka_kelas = int(m.group())
+        if angka_kelas in KELAS_KE_LEVEL_AWAL:
+            return KELAS_KE_LEVEL_AWAL[angka_kelas]
+    return LEVEL_AWAL_DEFAULT
 
 
-def sudah_pernah_pretest(nama: str, kelas: str) -> bool:
-    """Mengecek ke Google Sheets apakah kombinasi Nama+Kelas ini
-    sudah pernah mengerjakan pretest sebelumnya."""
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    try:
-        data = conn.read(worksheet=NAMA_WORKSHEET, ttl=0)
-        data = data.dropna(how="all")
-    except Exception:
-        # Worksheet belum ada -> belum pernah ada yang mengerjakan pretest
-        return False
-
-    if data.empty or "Nama" not in data.columns or "Kelas" not in data.columns:
-        return False
-
-    nama_target = normalisasi(nama)
-    kelas_target = normalisasi(kelas)
-
-    nama_cocok = data["Nama"].astype(str).apply(normalisasi) == nama_target
-    kelas_cocok = data["Kelas"].astype(str).apply(normalisasi) == kelas_target
-    return bool((nama_cocok & kelas_cocok).any())
+def tentukan_label_level(level_tertinggi_lulus):
+    """Menentukan label level penempatan akhir berdasarkan level
+    tertinggi yang berhasil dilewati (lulus kedua soalnya)."""
+    if level_tertinggi_lulus is None:
+        return "Level 0.1", 0
+    penempatan = level_tertinggi_lulus + 1
+    if penempatan > LEVEL_MAX:
+        return "Lulus semua level (tuntas s.d. Level 30)", LEVEL_MAX
+    return f"Level {penempatan}.1", penempatan
 
 
 # =========================================================
@@ -147,21 +262,25 @@ def _decode_progress(token: str) -> dict:
 
 
 def simpan_progres_ke_url():
-    """Menyalin progres pengerjaan saat ini ke query parameter URL,
-    sehingga jika halaman ter-refresh (mis. koneksi sempat terputus),
-    progres dapat dipulihkan tanpa mengulang dari soal nomor 1."""
     data = {
         "tahap": st.session_state.tahap,
-        "index_soal": st.session_state.index_soal,
-        "daftar_jawaban": st.session_state.daftar_jawaban,
         "nama": st.session_state.nama,
         "kelas": st.session_state.kelas,
+        "rendah": st.session_state.rendah,
+        "tinggi": st.session_state.tinggi,
+        "level_uji": st.session_state.level_uji,
+        "soal_idx": st.session_state.soal_idx,
+        "jawaban_level_ini": st.session_state.jawaban_level_ini,
+        "level_tertinggi_lulus": st.session_state.level_tertinggi_lulus,
+        "ronde": st.session_state.ronde,
+        "riwayat_ronde": st.session_state.riwayat_ronde,
+        "riwayat_semua": st.session_state.riwayat_semua,
         "tersimpan": st.session_state.tersimpan,
     }
     try:
         st.query_params["p"] = _encode_progress(data)
     except Exception:
-        pass  # jika gagal, biarkan saja -> paling buruk progres tidak tersimpan di URL
+        pass
 
 
 def hapus_progres_url():
@@ -172,8 +291,29 @@ def hapus_progres_url():
         pass
 
 
-def simpan_ke_gsheets(nama: str, kelas: str, daftar_jawaban: list, skor: int, level: str):
-    """Menyimpan satu baris hasil pretest ke Google Sheets."""
+# =========================================================
+# GOOGLE SHEETS
+# =========================================================
+def sudah_pernah_pretest(nama: str, kelas: str) -> bool:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    try:
+        data = conn.read(worksheet=NAMA_WORKSHEET, ttl=0)
+        data = data.dropna(how="all")
+    except Exception:
+        return False
+
+    if data.empty or "Nama" not in data.columns or "Kelas" not in data.columns:
+        return False
+
+    nama_target = normalisasi(nama)
+    kelas_target = normalisasi(kelas)
+    nama_cocok = data["Nama"].astype(str).apply(normalisasi) == nama_target
+    kelas_cocok = data["Kelas"].astype(str).apply(normalisasi) == kelas_target
+    return bool((nama_cocok & kelas_cocok).any())
+
+
+def simpan_ke_gsheets(nama, kelas, level_label, level_penempatan, level_tertinggi_lulus,
+                      riwayat_ronde, riwayat_semua):
     conn = st.connection("gsheets", type=GSheetsConnection)
 
     worksheet_sudah_ada = True
@@ -181,20 +321,29 @@ def simpan_ke_gsheets(nama: str, kelas: str, daftar_jawaban: list, skor: int, le
         data_lama = conn.read(worksheet=NAMA_WORKSHEET, ttl=0)
         data_lama = data_lama.dropna(how="all")
     except Exception:
-        # Worksheet dengan nama NAMA_WORKSHEET belum ada di spreadsheet
         data_lama = pd.DataFrame()
         worksheet_sudah_ada = False
+
+    total_soal = len(riwayat_semua)
+    total_benar = sum(1 for it in riwayat_semua if it["benar"])
+    ringkasan_ronde = " | ".join(
+        f"Level {r['level']} ({NAMA_LEVEL.get(r['level'], '')}): {r['skor']}/2 "
+        f"{'LULUS' if r['lulus'] else 'gagal'}"
+        for r in riwayat_ronde
+    )
 
     baris_baru = {
         "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "Nama": nama,
         "Kelas": kelas,
-        "Skor": skor,
-        "Level": level,
+        "Level_Penempatan": level_label,
+        "Level_Penempatan_Angka": level_penempatan,
+        "Level_Tertinggi_Lulus": level_tertinggi_lulus if level_tertinggi_lulus is not None else "-",
+        "Total_Soal_Dikerjakan": total_soal,
+        "Total_Benar": total_benar,
+        "Ringkasan_Per_Ronde": ringkasan_ronde,
+        "Detail_Jawaban_JSON": json.dumps(riwayat_semua, ensure_ascii=False),
     }
-    for i, item in enumerate(daftar_jawaban, start=1):
-        baris_baru[f"Soal_{i}_Jawaban"] = item["jawaban"]
-        baris_baru[f"Soal_{i}_Benar"] = "Ya" if item["benar"] else "Tidak"
 
     df_baru = pd.DataFrame([baris_baru])
     data_gabungan = pd.concat([data_lama, df_baru], ignore_index=True)
@@ -202,13 +351,11 @@ def simpan_ke_gsheets(nama: str, kelas: str, daftar_jawaban: list, skor: int, le
     if worksheet_sudah_ada:
         conn.update(worksheet=NAMA_WORKSHEET, data=data_gabungan)
     else:
-        # Worksheet belum tersedia di spreadsheet -> buat baru sekaligus isi datanya
         conn.create(worksheet=NAMA_WORKSHEET, data=data_gabungan)
 
 
 # =========================================================
-# STATE AWAL (dipulihkan dari URL jika sesi sebelumnya sempat
-# terputus, misalnya karena siswa lama menjawab)
+# STATE AWAL (dipulihkan dari URL jika sesi sempat terputus)
 # =========================================================
 if "tahap" not in st.session_state:
     progres_url = None
@@ -218,36 +365,41 @@ if "tahap" not in st.session_state:
     except Exception:
         progres_url = None
 
-    if progres_url:
-        st.session_state.tahap = progres_url.get("tahap", "identitas")
-        st.session_state.index_soal = progres_url.get("index_soal", 0)
-        st.session_state.daftar_jawaban = progres_url.get("daftar_jawaban", [])
-        st.session_state.nama = progres_url.get("nama", "")
-        st.session_state.kelas = progres_url.get("kelas", "")
-        st.session_state.tersimpan = progres_url.get("tersimpan", False)
-    else:
-        st.session_state.tahap = "identitas"   # identitas -> soal -> selesai
-        st.session_state.index_soal = 0
-        st.session_state.daftar_jawaban = []
-        st.session_state.nama = ""
-        st.session_state.kelas = ""
-        st.session_state.tersimpan = False
+    default_state = {
+        "tahap": "identitas",
+        "nama": "",
+        "kelas": "",
+        "rendah": LEVEL_MIN,
+        "tinggi": LEVEL_MAX,
+        "level_uji": LEVEL_AWAL_DEFAULT,
+        "soal_idx": 0,
+        "jawaban_level_ini": [],
+        "level_tertinggi_lulus": None,
+        "ronde": 0,
+        "riwayat_ronde": [],
+        "riwayat_semua": [],
+        "tersimpan": False,
+    }
+    sumber = progres_url if progres_url else default_state
+    for k, v in default_state.items():
+        st.session_state[k] = sumber.get(k, v)
 
 
 # =========================================================
 # TAHAP 1: FORM IDENTITAS
 # =========================================================
 if st.session_state.tahap == "identitas":
-    st.title("🧮 Pretest Matematika")
-    st.subheader("Operasi Hitung Bilangan Bulat")
+    st.title("🧮 Pretest Matematika Adaptif")
+    st.subheader("Menentukan Level Awal Kemampuan Matematika")
     st.write(
         "Sebelum memulai, silakan isi data diri terlebih dahulu. "
-        "Terdapat **24 soal** yang harus dikerjakan satu per satu."
+        "Soal akan menyesuaikan otomatis dengan kemampuanmu — jumlah soal "
+        "tidak tetap, tergantung seberapa cepat sistem menemukan level yang pas."
     )
 
     with st.form("form_identitas"):
         nama_input = st.text_input("Nama Lengkap")
-        kelas_input = st.text_input("Kelas")
+        kelas_input = st.text_input("Kelas (contoh: 5, 5A, 7B)")
         mulai = st.form_submit_button("Mulai Pretest")
 
         if mulai:
@@ -267,73 +419,107 @@ if st.session_state.tahap == "identitas":
                 else:
                     st.session_state.nama = nama_input.strip()
                     st.session_state.kelas = kelas_input.strip()
+                    st.session_state.level_uji = tebak_level_awal(kelas_input.strip())
                     st.session_state.tahap = "soal"
                     simpan_progres_ke_url()
                     st.rerun()
 
 # =========================================================
-# TAHAP 2: MENAMPILKAN SOAL SATU PER SATU
+# TAHAP 2: SOAL ADAPTIF
 # =========================================================
 elif st.session_state.tahap == "soal":
-    idx = st.session_state.index_soal
-    soal_aktif = QUESTIONS[idx]
-    level_soal = soal_aktif["level"]
-    teks_soal = soal_aktif["soal"]
-    kunci_jawaban = soal_aktif["kunci"]
-    tipe_soal = soal_aktif["tipe"]
+    level_uji = st.session_state.level_uji
+    soal_idx = st.session_state.soal_idx
+    item_aktif = ITEM_BANK[level_uji][soal_idx]
 
-    st.title("🧮 Pretest Matematika")
-    st.progress((idx) / TOTAL_SOAL)
-    st.caption(f"Soal {idx + 1} dari {TOTAL_SOAL}")
+    st.title("🧮 Pretest Matematika Adaptif")
+    estimasi_progres = min(st.session_state.ronde / MAKS_RONDE, 0.95)
+    st.progress(estimasi_progres)
+    st.caption(f"Tahap {st.session_state.ronde + 1} (perkiraan maksimal {MAKS_RONDE} tahap)")
 
-    st.markdown(f"### Soal {idx + 1}")
-    st.write(teks_soal)
+    st.markdown(f"### Soal {soal_idx + 1} dari 2 (tahap ini)")
+    st.write(item_aktif["soal"])
     st.caption("💡 Jika halaman error atau blank, refresh saja — progresmu tidak akan hilang.")
 
-    with st.form(key=f"form_soal_{idx}"):
-        if tipe_soal == "pilihan_ganda":
+    with st.form(key=f"form_soal_{level_uji}_{soal_idx}"):
+        if item_aktif["tipe"] == "pilihan_ganda":
             jawaban = st.radio(
                 "Pilih jawaban:",
-                options=soal_aktif["opsi"],
+                options=item_aktif["opsi"],
                 index=None,
-                key=f"input_{idx}",
+                key=f"input_{level_uji}_{soal_idx}",
             )
         else:
-            jawaban = st.text_input("Jawaban Anda:", key=f"input_{idx}")
+            jawaban = st.text_input("Jawaban Anda:", key=f"input_{level_uji}_{soal_idx}")
 
         lanjut = st.form_submit_button("Jawab & Lanjut ➜")
 
         if lanjut:
-            benar = cek_jawaban(jawaban, kunci_jawaban)
-            st.session_state.daftar_jawaban.append(
-                {"soal": teks_soal, "jawaban": jawaban, "benar": benar, "level": level_soal}
+            benar = cek_jawaban(jawaban, item_aktif["kunci"])
+            st.session_state.jawaban_level_ini.append(benar)
+            st.session_state.riwayat_semua.append(
+                {
+                    "level": level_uji,
+                    "soal": item_aktif["soal"],
+                    "jawaban": jawaban,
+                    "benar": benar,
+                }
             )
-            if idx + 1 < TOTAL_SOAL:
-                st.session_state.index_soal += 1
+
+            if soal_idx + 1 < len(ITEM_BANK[level_uji]):
+                # masih ada soal berikutnya di level yang sama
+                st.session_state.soal_idx += 1
             else:
-                st.session_state.tahap = "selesai"
+                # level ini selesai diuji -> evaluasi lulus/tidak
+                skor_level = sum(st.session_state.jawaban_level_ini)
+                lulus_level = skor_level == len(st.session_state.jawaban_level_ini)
+
+                st.session_state.riwayat_ronde.append(
+                    {"level": level_uji, "skor": skor_level, "lulus": lulus_level}
+                )
+                st.session_state.ronde += 1
+
+                if lulus_level:
+                    st.session_state.level_tertinggi_lulus = level_uji
+                    st.session_state.rendah = level_uji + 1
+                else:
+                    st.session_state.tinggi = level_uji - 1
+
+                if (
+                    st.session_state.rendah > st.session_state.tinggi
+                    or st.session_state.ronde >= MAKS_RONDE
+                ):
+                    st.session_state.tahap = "selesai"
+                else:
+                    st.session_state.level_uji = (
+                        st.session_state.rendah + st.session_state.tinggi
+                    ) // 2
+                    st.session_state.soal_idx = 0
+                    st.session_state.jawaban_level_ini = []
+
             simpan_progres_ke_url()
             st.rerun()
 
 # =========================================================
-# TAHAP 3: SELESAI -> HITUNG SKOR, SIMPAN, TAMPILKAN UCAPAN
-#           (SKOR & LEVEL TIDAK DITAMPILKAN KE SISWA)
+# TAHAP 3: SELESAI -> HITUNG LEVEL, SIMPAN, TAMPILKAN UCAPAN
+#           (LEVEL TIDAK DITAMPILKAN KE SISWA)
 # =========================================================
 elif st.session_state.tahap == "selesai":
-    st.title("🧮 Pretest Matematika")
+    st.title("🧮 Pretest Matematika Adaptif")
     st.progress(1.0)
 
-    skor = sum(1 for item in st.session_state.daftar_jawaban if item["benar"])
-    level = tentukan_level(skor)
+    level_label, level_penempatan = tentukan_label_level(st.session_state.level_tertinggi_lulus)
 
     if not st.session_state.tersimpan:
         try:
             simpan_ke_gsheets(
                 st.session_state.nama,
                 st.session_state.kelas,
-                st.session_state.daftar_jawaban,
-                skor,
-                level,
+                level_label,
+                level_penempatan,
+                st.session_state.level_tertinggi_lulus,
+                st.session_state.riwayat_ronde,
+                st.session_state.riwayat_semua,
             )
             st.session_state.tersimpan = True
             simpan_progres_ke_url()
@@ -351,26 +537,39 @@ elif st.session_state.tahap == "selesai":
     )
     st.info(
         "Hasil pretest kamu sudah tersimpan dan akan diinformasikan oleh gurumu. "
-        "Skor dan level tidak ditampilkan di halaman ini."
+        "Level penempatan tidak ditampilkan di halaman ini."
     )
 
     if st.button("Isi Ulang / Selesai"):
-        for key in ["tahap", "index_soal", "daftar_jawaban", "nama", "kelas", "tersimpan"]:
+        for key in [
+            "tahap", "nama", "kelas", "rendah", "tinggi", "level_uji", "soal_idx",
+            "jawaban_level_ini", "level_tertinggi_lulus", "ronde", "riwayat_ronde",
+            "riwayat_semua", "tersimpan",
+        ]:
             del st.session_state[key]
         hapus_progres_url()
         st.rerun()
 
 # =========================================================
-# CATATAN UNTUK GURU (disembunyikan dari alur utama, opsional)
+# CATATAN UNTUK GURU (sidebar)
 # =========================================================
 with st.sidebar:
-    st.markdown("#### Panduan Level (untuk Guru)")
+    st.markdown("#### Panduan Sistem Adaptif (untuk Guru)")
     st.caption(
-        "- Skor 24 → Lulus semua level\n"
-        "- Skor 19–23 → Level 3.1\n"
-        "- Skor 13–18 → Level 2.1\n"
-        "- Skor 7–12 → Level 1.1\n"
-        "- Skor 0–6 → Level 0.1\n\n"
-        "Hasil lengkap tiap siswa dapat dilihat pada Google Sheets "
-        f"di worksheet **'{NAMA_WORKSHEET}'**."
+        "Pretest ini bersifat **adaptif** menggunakan metode binary search "
+        "di antara Level 0 sampai Level 30 (mengikuti kurikulum SD-SMP).\n\n"
+        "**Cara penilaian:**\n"
+        "- Setiap level diuji dengan 2 soal representatif.\n"
+        "- Kedua soal benar → dianggap **lulus** level tsb, sistem naik ke "
+        "level lebih tinggi.\n"
+        "- Ada yang salah → dianggap **belum lulus**, sistem turun ke level "
+        "lebih rendah.\n"
+        "- Level penempatan akhir = satu level di atas level tertinggi yang "
+        "lulus (mis. lulus s.d. Level 9 → penempatan Level 10.1).\n\n"
+        "Hasil lengkap (level penempatan, ringkasan per tahap, dan detail "
+        "tiap jawaban dalam format JSON) tersimpan otomatis di Google Sheets "
+        f"pada worksheet **'{NAMA_WORKSHEET}'**."
     )
+    with st.expander("Lihat daftar nama Level 0-30"):
+        for lvl, nm in NAMA_LEVEL.items():
+            st.caption(f"**Level {lvl}** — {nm}")
